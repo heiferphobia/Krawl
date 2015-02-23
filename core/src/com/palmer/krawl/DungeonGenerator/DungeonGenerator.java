@@ -91,8 +91,8 @@ public class DungeonGenerator {
         while (trianglesIterator.hasNext()) {
             TriangleDT curr = trianglesIterator.next();
             if (!curr.isHalfplane()) {
-                System.out.println(curr.p1() + ", " + curr.p2() + ", "
-                        + curr.p3());
+//                System.out.println(curr.p1() + ", " + curr.p2() + ", "
+//                        + curr.p3());
                 triangles.add(curr);
             }
 
@@ -229,18 +229,69 @@ public class DungeonGenerator {
     }
     public Vector2 moveRoomSoThatItDoesNotOverLap(Room currentRoom) {
         int neighbours = 0;
+        Vector2 currBottomLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().y);
+        Vector2 currBottomRight = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1);
+        Vector2 currTopLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().height -1);
+        Vector2 currTopRight = new Vector2((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1, (int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1);
+        Vector2 centerPointOfCurrRoom = new Vector2 (((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1 )/ 2, (((int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1)  / 2));
+
         Vector2 v = new Vector2((int) currentRoom.getRectangle().x, (int) currentRoom.getRectangle().y);
         for (Room room : rooms) {
             if (!currentRoom.equals(room)) {
-                Vector2 currBottomLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().y);
-                Vector2 currBottomRight = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1);
-                Vector2 currTopLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().height -1);
-                Vector2 currTopRight = new Vector2((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1, (int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1);
-                Vector2 centerPointOfCurrRoom = new Vector2 (((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1 )/ 2, (((int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1)  / 2));
+               if (currentRoom.getRectangle().overlaps(room.getRectangle())) {
+                   Vector2 roomBottomLeft = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().y);
+                   Vector2 roomBottomRight = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().x + (int)room.getRectangle().width -1);
+                   Vector2 roomTopLeft = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().x + (int)room.getRectangle().height -1);
+                   Vector2 roomTopRight = new Vector2((int)room.getRectangle().x + (int)room.getRectangle().width -1, (int)room.getRectangle().y + (int)room.getRectangle().height -1);
+                   Vector2 centerPointOfRoom = new Vector2 (((int)room.getRectangle().x + (int)room.getRectangle().width -1 )/ 2, (((int)room.getRectangle().y + (int)room.getRectangle().height -1)  / 2));
 
+
+                   if (roomIsInBottomLeftQuadrant(roomBottomLeft, currBottomLeft)) {
+                       int diffLeft = (int)currBottomLeft.x - (int)roomBottomLeft.x;
+                       int diffDown = (int)currBottomLeft.x - (int)roomBottomLeft.x;
+                       System.out.println("Is in bottom left");
+                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
+                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
+                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
+                               "X2,Y2: " + currTopLeft.x + "," + currTopRight +"\n");
+                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
+                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
+                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
+                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
+                       System.out.println("--------------------------------------------------------------");
+                   }
+                   if (roomIsInTopLeftQuadrant(roomBottomLeft, currBottomLeft)) {
+                       System.out.println("Is in top left");
+                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
+                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
+                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
+                               "X2,Y2: " + currTopLeft.x + "," + currTopRight +"\n");
+                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
+                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
+                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
+                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
+                       System.out.println("--------------------------------------------------------------");
+                   }
+                   if (roomIsInTopRightQuadrant(roomBottomLeft, currBottomLeft)) {
+                       System.out.println("Is in top right");
+                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
+                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
+                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
+                               "X2,Y2: " + currTopLeft.x + "," + currTopRight.y +"\n");
+                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
+                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
+                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
+                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
+                       System.out.println("--------------------------------------------------------------");
+                   }
+
+                   neighbours++;
+
+
+               }
             }
         }
-        System.out.println("NeighborCount: " + neighbours);
+//        System.out.println("NeighborCount: " + neighbours);
 
         if (neighbours != 0) {
             v.x = v.x / neighbours;
@@ -251,6 +302,21 @@ public class DungeonGenerator {
         } else {
             return v;
         }
+    }
+
+    private boolean roomIsInBottomLeftQuadrant(Vector2 room, Vector2 currRoom) {
+
+        return (room.x <= currRoom.x && room.y <= currRoom.y);
+    }
+
+    private boolean roomIsInTopLeftQuadrant(Vector2 room, Vector2 currRoom) {
+
+        return (room.x <= currRoom.x && room.y >= currRoom.y);
+    }
+
+    private boolean roomIsInTopRightQuadrant(Vector2 room, Vector2 currRoom) {
+
+        return (room.x >= currRoom.x && room.y >= currRoom.y);
     }
 
     private int getDifference(int num1, int num2) {
