@@ -18,8 +18,10 @@ import com.badlogic.gdx.math.Vector2;
 import com.palmer.krawl.DungeonGenerator.DungeonGenerator;
 import com.palmer.krawl.DungeonGenerator.Room;
 import com.palmer.krawl.Krawl;
+import com.palmer.krawl.delaunay_triangulation.PointDT;
 import com.palmer.krawl.delaunay_triangulation.TriangleDT;
 
+import java.util.Arrays;
 import java.util.List;
 
 public class GameScreen implements Screen, GestureDetector.GestureListener, InputProcessor {
@@ -34,8 +36,12 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
     float initialZoom;
     private SpriteBatch spriteBatch;
     private BitmapFont font;
-    boolean showSingleCellRooms = true;
-    boolean showRoomPoints = true;
+    boolean showSingleCellRooms = false;
+    boolean showRoomPoints = false;
+    boolean showSpanningTree = true;
+    boolean roomsGenerated = false;
+    private static final int MIN_ROOMS = 10;
+    private static final int MAX_ROOMS = 20;
 
     private DungeonGenerator dungeonGenerator;
 
@@ -52,14 +58,17 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
         spriteBatch = new SpriteBatch();
         camera = new OrthographicCamera(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
+
         dungeonGenerator = new DungeonGenerator();
         shapeRenderer = new ShapeRenderer();
         shapeRenderer.setAutoShapeType(true);
-        maxRoomSize = MathUtils.random(10, 150);
-        radius = maxRoomSize;
-        camera.zoom =  ((float)Gdx.graphics.getHeight() / (float)Gdx.graphics.getWidth()) * .04f;
+        maxRoomSize = MathUtils.random(MIN_ROOMS, MAX_ROOMS);
+        radius = 0;
         rooms = dungeonGenerator.generateDungeon(maxRoomSize, radius);
+        roomsGenerated = true;
         camera.position.set(dungeonGenerator.getStartVector(), 0);
+        camera.zoom =  ((float)Gdx.graphics.getHeight() / (float)Gdx.graphics.getWidth()) * .04f;
+
         camera.update();
 
 
@@ -76,84 +85,98 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
 
         //Show the rooms generated
         shapeRenderer.begin();
-            for (Room room: rooms) {
-
+            for (Room room : rooms) {
                 shapeRenderer.setColor(room.getColor());
                 shapeRenderer.rect(room.getRectangle().x, room.getRectangle().y, room.getRectangle().width, room.getRectangle().height);
             }
         shapeRenderer.end();
 
-        //Fill the start room  && boss room for Visual Aide
-        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        if (roomsGenerated) {
+            //Fill the start room  && boss room for Visual Aide
+            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
             shapeRenderer.setColor(dungeonGenerator.getStartRoom().getColor());
             shapeRenderer.rect(dungeonGenerator.getStartRoom().getRectangle().x, dungeonGenerator.getStartRoom().getRectangle().y, dungeonGenerator.getStartRoom().getRectangle().width, dungeonGenerator.getStartRoom().getRectangle().height);
             shapeRenderer.setColor(dungeonGenerator.getBossRoom().getColor());
             shapeRenderer.rect(dungeonGenerator.getBossRoom().getRectangle().x, dungeonGenerator.getBossRoom().getRectangle().y, dungeonGenerator.getBossRoom().getRectangle().width, dungeonGenerator.getBossRoom().getRectangle().height);
-        shapeRenderer.end();
-
-        //Show the Parent Container
-        shapeRenderer.begin();
-        shapeRenderer.setColor(Color.ORANGE);
-        shapeRenderer.rect(dungeonGenerator.getParentRectangle().x, dungeonGenerator.getParentRectangle().y, dungeonGenerator.getParentRectangle().width, dungeonGenerator.getParentRectangle().height);
-        shapeRenderer.end();
-
-        //Show single rooms if enabled
-        if (showSingleCellRooms) {
-            shapeRenderer.begin();
-            for (Room singleRoom: dungeonGenerator.getSingleCellRooms()) {
-                shapeRenderer.setColor(singleRoom.getColor());
-                shapeRenderer.rect(singleRoom.getRectangle().x, singleRoom.getRectangle().y, singleRoom.getRectangle().width, singleRoom.getRectangle().height);
-            }
             shapeRenderer.end();
-        }
 
-        //Show all rooms' center points
-        if (showRoomPoints) {
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            for (Room room: dungeonGenerator.getRooms()) {
+            //Show the Parent Container
+            shapeRenderer.begin();
+            shapeRenderer.setColor(Color.ORANGE);
+            shapeRenderer.rect(dungeonGenerator.getParentRectangle().x, dungeonGenerator.getParentRectangle().y, dungeonGenerator.getParentRectangle().width, dungeonGenerator.getParentRectangle().height);
+            shapeRenderer.end();
+
+            //Show single rooms if enabled
+            if (showSingleCellRooms) {
+                shapeRenderer.begin();
+                for (Room singleRoom : dungeonGenerator.getSingleCellRooms()) {
+                    shapeRenderer.setColor(singleRoom.getColor());
+                    shapeRenderer.rect(singleRoom.getRectangle().x, singleRoom.getRectangle().y, singleRoom.getRectangle().width, singleRoom.getRectangle().height);
+                }
+                shapeRenderer.end();
+            }
+
+            //Show all rooms' center points
+            if (showRoomPoints) {
+                shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+                for (Room room : dungeonGenerator.getRooms()) {
+                    shapeRenderer.setColor(Color.MAGENTA);
+                    shapeRenderer.circle(room.getRectangle().x + room.getRectangle().width / 2, room.getRectangle().y + room.getRectangle().height / 2, .5f);
+                }
+                shapeRenderer.end();
+            }
+
+//            Show all triangles
+
+            if (showRoomPoints) {
+                shapeRenderer.begin();
+                Gdx.gl20.glLineWidth(1f);
                 shapeRenderer.setColor(Color.MAGENTA);
-                shapeRenderer.circle(room.getRectangle().x + room.getRectangle().width / 2, room.getRectangle().y + room.getRectangle().height / 2, .5f);
-            }
-            shapeRenderer.end();
-        }
-
-        //Show all triangles
-
-        if (showRoomPoints) {
-            shapeRenderer.begin();
-            Gdx.gl20.glLineWidth(1f);
-            shapeRenderer.setColor(Color.MAGENTA);
-            List<TriangleDT> triangles = dungeonGenerator.getTriangles();
-            for (TriangleDT curr: triangles) {
-                if (!curr.isHalfplane()) {
-                    shapeRenderer.triangle((float)curr.p1().x(), (float)curr.p1().y(), (float)curr.p2().x(), (float)curr.p2().y(), (float)curr.p3().x(), (float)curr.p3().y());
+                List<TriangleDT> triangles = dungeonGenerator.getTriangles();
+                for (TriangleDT curr : triangles) {
+                    if (!curr.isHalfplane()) {
+                        shapeRenderer.triangle((float) curr.p1().x(), (float) curr.p1().y(), (float) curr.p2().x(), (float) curr.p2().y(), (float) curr.p3().x(), (float) curr.p3().y());
 //                    shapeRenderer.line((int)curr.p1().x(), (int)curr.p1().y(), (int)curr.p2().x(), (int)curr.p2().y());
 //                    shapeRenderer.line((int)curr.p2().x(), (int)curr.p2().y(), (int)curr.p3().x(), (int)curr.p3().y());
 //                    shapeRenderer.line((int)curr.p3().x(), (int)curr.p3().y(), (int)curr.p1().x(), (int)curr.p1().y());
-    //                shapeRenderer.triangle((int)curr.p1().x(), (int)curr.p1().y(), (int)curr.p2().x(), (int)curr.p2().y(), (int)curr.p3().x(), (int)curr.p3().y());
-    //                System.out.println(curr.p1() + ", " + curr.p2() + ", "
-    //                        + curr.p3());
+                        //                shapeRenderer.triangle((int)curr.p1().x(), (int)curr.p1().y(), (int)curr.p2().x(), (int)curr.p2().y(), (int)curr.p3().x(), (int)curr.p3().y());
+                        //                System.out.println(curr.p1() + ", " + curr.p2() + ", "
+                        //                        + curr.p3());
+                    }
                 }
+                shapeRenderer.end();
+
             }
-            shapeRenderer.end();
+            if (showSpanningTree) {
+                shapeRenderer.begin();
+                shapeRenderer.setColor(Color.ORANGE);
+                List<Object> spanningTree = Arrays.asList(dungeonGenerator.getMinimumSpanningTree().toArray());
+                for (int x = 0; x < spanningTree.size() -2; x++) {
+                    if (x != spanningTree.size() -1) {
+                        PointDT spanningTreeX = (PointDT)spanningTree.get(x);
+                        PointDT spanningTreeXPlus1 = (PointDT)spanningTree.get(x +1);
+                        shapeRenderer.line((float)spanningTreeX.x(), (float) spanningTreeX.y(), (float) spanningTreeXPlus1.x(), (float) spanningTreeXPlus1.y());
+                    }
+
+                }
+                shapeRenderer.end();
+            }
+
+            //Draw all debug info to screen
+            spriteBatch.begin();
+            font.setColor(1.0f, 1.0f, 1.0f, 1.0f);
+            font.draw(spriteBatch, "Zoom: " + camera.zoom, 10, Gdx.graphics.getHeight() - 10);
+            font.draw(spriteBatch, "Camera.X: " + camera.position.x, 10, Gdx.graphics.getHeight() - 40);
+            font.draw(spriteBatch, "Camera.Y: " + camera.position.y, 10, Gdx.graphics.getHeight() - 70);
+            font.draw(spriteBatch, "Rooms Start Count: " + maxRoomSize, 10, Gdx.graphics.getHeight() - 100);
+            font.draw(spriteBatch, "Rooms Removed: " + dungeonGenerator.getRoomsRemovedCount(), 10, Gdx.graphics.getHeight() - 130);
+            font.draw(spriteBatch, "Rooms End Count: " + dungeonGenerator.getRooms().size(), 10, Gdx.graphics.getHeight() - 160);
+            font.draw(spriteBatch, "Radius: " + radius, 10, Gdx.graphics.getHeight() - 190);
+            font.draw(spriteBatch, "Level Generation Time (ms): " + dungeonGenerator.getRenderTime(), 10, 40);
+//            font.draw(spriteBatch, "Parent Container: " + dungeonGenerator.getParentRectangle().x + "," + dungeonGenerator.getParentRectangle().y + " WIDTH: " + dungeonGenerator.getParentRectangle().width + " HEIGHT: " + dungeonGenerator.getParentRectangle().height, 10, 70);
+            spriteBatch.end();
         }
-
-        //Draw all debug info to screen
-        spriteBatch.begin();
-        font.setColor(1.0f, 1.0f, 1.0f, 1.0f);
-        font.draw(spriteBatch, "Zoom: " + camera.zoom, 10, Gdx.graphics.getHeight() - 10);
-        font.draw(spriteBatch, "Camera.X: " + camera.position.x, 10, Gdx.graphics.getHeight() - 40);
-        font.draw(spriteBatch, "Camera.Y: " + camera.position.y, 10, Gdx.graphics.getHeight() - 70);
-        font.draw(spriteBatch, "Rooms Start Count: " + maxRoomSize, 10,  Gdx.graphics.getHeight() - 100);
-        font.draw(spriteBatch, "Rooms Removed: " + dungeonGenerator.getRoomsRemovedCount(), 10,  Gdx.graphics.getHeight() - 130);
-        font.draw(spriteBatch, "Rooms End Count: " + dungeonGenerator.getRooms().size(), 10,  Gdx.graphics.getHeight() - 160);
-        font.draw(spriteBatch, "Radius: " + radius, 10,  Gdx.graphics.getHeight() - 190);
-        font.draw(spriteBatch, "Level Generation Time (ms): " + dungeonGenerator.getRenderTime(), 10,  40);
-        font.draw(spriteBatch, "Parent Container: " + dungeonGenerator.getParentRectangle().x + "," + dungeonGenerator.getParentRectangle().y + " WIDTH: " + dungeonGenerator.getParentRectangle().width + " HEIGHT: " +dungeonGenerator.getParentRectangle().height, 10,  70);
-        spriteBatch.end();
-
-        handleInput(Gdx.graphics.getDeltaTime());
-
+            handleInput(Gdx.graphics.getDeltaTime());
 
     }
 
@@ -227,14 +250,15 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
 
     @Override
     public boolean longPress(float x, float y) {
-        maxRoomSize = MathUtils.random(10, 30);
+        maxRoomSize = MathUtils.random(MIN_ROOMS, MAX_ROOMS);
         rooms = dungeonGenerator.generateDungeon(maxRoomSize, radius);
         return false;
     }
 
     @Override
     public boolean fling(float velocityX, float velocityY, int button) {
-        showSingleCellRooms = !showSingleCellRooms;
+//        showSingleCellRooms = !showSingleCellRooms;
+        showRoomPoints = !showRoomPoints;
 
         return false;
     }

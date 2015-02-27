@@ -1,10 +1,10 @@
 package com.palmer.krawl.DungeonGenerator;
 
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Rectangle;
 import com.badlogic.gdx.math.Vector2;
+import com.palmer.krawl.SpanningTree.MinimumSpanningTree;
 import com.palmer.krawl.delaunay_triangulation.DelaunayTriangulation;
 import com.palmer.krawl.delaunay_triangulation.PointDT;
 import com.palmer.krawl.delaunay_triangulation.TriangleDT;
@@ -12,6 +12,7 @@ import com.palmer.krawl.delaunay_triangulation.TriangleDT;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 public class DungeonGenerator {
@@ -28,6 +29,7 @@ public class DungeonGenerator {
     private int roomsRemoved;
     private List<Vector2> linePoints;
     private List<TriangleDT> triangles;
+    private Set<PointDT> minimumSpanningTree;
     public DungeonGenerator() {
 
     }
@@ -39,41 +41,84 @@ public class DungeonGenerator {
         for (int roomCount = 0; roomCount < numberOfRoomsToGenerate; roomCount++) {
             Room room = null;
             if (roomCount == 0) {
-                room = new Room(new Rectangle(getRandom(0, radius), getRandom(0, radius), getRandom(12, 15), getRandom(12, 15)));
-                room.setColor(Color.GREEN);
-                startRoom = room;
-            } else if (roomCount == numberOfRoomsToGenerate -1) {
-                room = new Room(new Rectangle(getRandom(0, radius), getRandom(0, radius), getRandom(12, 30), getRandom(12, 30)));
+                room = new Room(new Rectangle(0, 0, getRandom(20, 30), getRandom(20, 30)));
                 room.setColor(Color.RED);
-                bossRoom = room;
             } else {
-                room = new Room(new Rectangle(getRandom(0, radius), getRandom(0, radius), getRandom(4, 30), getRandom(4, 30)));
+                room = new Room(new Rectangle(0, 0, getRandom(10, 30), getRandom(10, 30)));
             }
+            room.setName("Room" + roomCount);
+
             rooms.add(room);
-
         }
-        Gdx.app.log("#Move Rooms Called:", " " + ++timesMoveRoomsCalled);
-        Gdx.app.log("#Move Random Called:", " " + ++moveRandomCalled);
-//        for (int x = 0; x < rooms.size(); x++) {
-//            Gdx.app.log("------------------------------------------------------------------", "");
-//            Gdx.app.log("Room #" + x + " moved left:", " " + rooms.get(x).getMovedLeft());
-//            Gdx.app.log("Room #" + x + " moved right:", " " + rooms.get(x).getMovedRight());
-//            Gdx.app.log("Room #" + x + " moved up:", " " + rooms.get(x).getMovedUp());
-//            Gdx.app.log("Room #" + x + " moved down:", " " + rooms.get(x).getMovedDown());
-//            Gdx.app.log("------------------------------------------------------------------", "");
-//
-//
-//        }
-        removeUnwantedRooms();
-        separateRooms();
-
+        System.out.println(numberOfRoomsToGenerate + " rooms generated");
+//        removeUnwantedRooms();
+        separateRooms(rooms);
         generateParentContainer(rooms);
         generateSingleCellRooms(rooms);
         mapRoomPoints();
+        MinimumSpanningTree minimumSpanningTree = new MinimumSpanningTree();
+        this.minimumSpanningTree = minimumSpanningTree.generateMiminumSpanningTree(this.getTriangles());
+        setStartRoom(rooms);
+        setBossRoom(rooms);
         renderTime = System.currentTimeMillis() - startTime;
         return rooms;
     }
+    public void separateRooms(List<Room> rooms) {
+        int count = 0;
 
+        for (Room room: rooms) {
+
+            while (overlapsAnyOtherRoom(room, rooms)) {
+                int dir = getRandom(0, 3);
+                switch(dir) {
+                    case 0:
+                        room.getRectangle().x -= 1;
+                        break;
+                    case 1:
+                        room.getRectangle().x += 1;
+                        break;
+                    case 2:
+                        room.getRectangle().y -= 1;
+                        break;
+                    case 3:
+                        room.getRectangle().y += 1;
+                        break;
+                }
+                count++;
+            }
+        }
+        System.out.println("Separated rooms " + count + " times");
+    }
+    private boolean overlapsAnyOtherRoom(Room room, List<Room> rooms) {
+        boolean overlaps = false;
+        for (Room checkRoom : rooms) {
+            if (!room.equals(checkRoom)) {
+                if (room.getRectangle().overlaps(checkRoom.getRectangle())) {
+                    return true;
+                }
+            }
+        }
+        return overlaps;
+    }
+    private void removeSoloRooms(List<Room> rooms) {
+        for (Room room : rooms) {
+            if (isSoloRoom(room, rooms)) {
+                rooms.remove(room);
+                System.out.println("Removing Room: " + room.getName());
+            }
+        }
+    }
+    private boolean isSoloRoom(Room room, List<Room> rooms) {
+        boolean isSolo = true;
+        for (Room checkRoom : rooms) {
+            if (!room.equals(checkRoom)) {
+                if (room.getRectangle().contains(checkRoom.getRectangle().x, checkRoom.getRectangle().y)) {
+                    return false;
+                }
+            }
+        }
+        return isSolo;
+    }
     public void mapRoomPoints() {
         linePoints = new CopyOnWriteArrayList<Vector2>();
         for (Room room: rooms) {
@@ -107,6 +152,7 @@ public class DungeonGenerator {
     public List<TriangleDT> getTriangles() {
         return this.triangles;
     }
+    public Set<PointDT> getMinimumSpanningTree(){return  this.minimumSpanningTree;}
     public void generateParentContainer(List<Room> rooms){
         int highestPoint = -9999;
         int lowestPoint = 9999;
@@ -155,33 +201,27 @@ public class DungeonGenerator {
         }
     }
 
+    private void setStartRoom(List<Room> rooms) {
+        int startRoom = getRandom(0, rooms.size() - 1);
+        while(!(rooms.get(startRoom).getRectangle().width > 12) || !(rooms.get(startRoom).getRectangle().height > 12)) {
+            startRoom = getRandom(0, rooms.size() -1);
+        }
+        this.startRoom = rooms.get(startRoom);
+    }
+    private void setBossRoom(List<Room> rooms) {
+        int bossRoom = getRandom(0, rooms.size() - 1);
+        while(!(rooms.get(bossRoom).getRectangle().width > 12) || !(rooms.get(bossRoom).getRectangle().height > 12) && !rooms.get(bossRoom).getRectangle().contains(startRoom.getRectangle())) {
+            bossRoom = getRandom(0, rooms.size() -1);
+        }
+        this.bossRoom = rooms.get(bossRoom);
+    }
+
     public List<Room> getSingleCellRooms() {
         return this.singleCellRooms;
     }
 
     public List<Room> getRooms() {
         return this.rooms;
-    }
-    public void  removeUnwantedRooms() {
-        roomsRemoved = 0;
-        for (Room room: rooms) {
-            if (room.getRectangle().width < 12 || room.getRectangle().height < 12) {
-                rooms.remove(room);
-                roomsRemoved++;
-            }
-        }
-//        radius = rooms.size() + rooms.size() /2;
-//        int startRadius = 1;
-//
-//        for (Room room: rooms) {
-//            room.getRectangle().setPosition(getRandom(0, radius), getRandom(0, radius));
-////            if (startRadius >= radius) {
-////                startRadius = radius;
-////            } else {
-////                startRadius += 1;
-////            }
-//            moveRoomSoThatItDoesNotOverLap(room, rooms);
-//        }
     }
 
     public int getRoomsRemovedCount () {
@@ -197,10 +237,6 @@ public class DungeonGenerator {
 
         return ((xmin >= rec1.x && xmin <= rec1.x + rec1.width) && (xmax >= rec1.x && xmax <= rec1.x + rec1.width))
                 && ((ymin >= rec1.y && ymin <= rec1.y + rec1.height) && (ymax >= rec1.y && ymax <= rec1.y + rec1.height));
-    }
-    public boolean containsCoords(int x, int y, Rectangle rectangle) {
-        return rectangle.x -1 < x && rectangle.x-1 + rectangle.width > x && rectangle.y-1 < y && rectangle.y-1 + rectangle.height > y;
-
     }
     public long getRenderTime() {
         return this.renderTime;
@@ -220,105 +256,6 @@ public class DungeonGenerator {
         return MathUtils.random(min, max);
     }
 
-    private void separateRooms() {
-        for (Room room: rooms) {
-//            moveRoomSoThatItDoesNotOverLap(room);
-            Vector2 newVector = moveRoomSoThatItDoesNotOverLap(room);
-            room.getRectangle().setPosition(newVector.x, newVector.y);
-        }
-    }
-    public Vector2 moveRoomSoThatItDoesNotOverLap(Room currentRoom) {
-        int neighbours = 0;
-        Vector2 currBottomLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().y);
-        Vector2 currBottomRight = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1);
-        Vector2 currTopLeft = new Vector2((int)currentRoom.getRectangle().x, (int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().height -1);
-        Vector2 currTopRight = new Vector2((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1, (int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1);
-        Vector2 centerPointOfCurrRoom = new Vector2 (((int)currentRoom.getRectangle().x + (int)currentRoom.getRectangle().width -1 )/ 2, (((int)currentRoom.getRectangle().y + (int)currentRoom.getRectangle().height -1)  / 2));
-
-        Vector2 v = new Vector2((int) currentRoom.getRectangle().x, (int) currentRoom.getRectangle().y);
-        for (Room room : rooms) {
-            if (!currentRoom.equals(room)) {
-               if (currentRoom.getRectangle().overlaps(room.getRectangle())) {
-                   Vector2 roomBottomLeft = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().y);
-                   Vector2 roomBottomRight = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().x + (int)room.getRectangle().width -1);
-                   Vector2 roomTopLeft = new Vector2((int)room.getRectangle().x, (int)room.getRectangle().x + (int)room.getRectangle().height -1);
-                   Vector2 roomTopRight = new Vector2((int)room.getRectangle().x + (int)room.getRectangle().width -1, (int)room.getRectangle().y + (int)room.getRectangle().height -1);
-                   Vector2 centerPointOfRoom = new Vector2 (((int)room.getRectangle().x + (int)room.getRectangle().width -1 )/ 2, (((int)room.getRectangle().y + (int)room.getRectangle().height -1)  / 2));
-
-
-                   if (roomIsInBottomLeftQuadrant(roomBottomLeft, currBottomLeft)) {
-                       int diffLeft = (int)currBottomLeft.x - (int)roomBottomLeft.x;
-                       int diffDown = (int)currBottomLeft.x - (int)roomBottomLeft.x;
-                       System.out.println("Is in bottom left");
-                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
-                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
-                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
-                               "X2,Y2: " + currTopLeft.x + "," + currTopRight +"\n");
-                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
-                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
-                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
-                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
-                       System.out.println("--------------------------------------------------------------");
-                   }
-                   if (roomIsInTopLeftQuadrant(roomBottomLeft, currBottomLeft)) {
-                       System.out.println("Is in top left");
-                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
-                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
-                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
-                               "X2,Y2: " + currTopLeft.x + "," + currTopRight +"\n");
-                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
-                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
-                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
-                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
-                       System.out.println("--------------------------------------------------------------");
-                   }
-                   if (roomIsInTopRightQuadrant(roomBottomLeft, currBottomLeft)) {
-                       System.out.println("Is in top right");
-                       System.out.println("CurrRoomCoords:\nX1,Y1: " + currBottomLeft.x + "," + currBottomLeft.y + "\n" +
-                               "X1,Y2: " + currTopLeft.x + "," + currTopLeft.y + "\n" +
-                               "X2,Y1: " + currBottomRight.x + "," + currBottomRight.y + "\n" +
-                               "X2,Y2: " + currTopLeft.x + "," + currTopRight.y +"\n");
-                       System.out.println("RoomCoords:\nX1,Y1: " + roomBottomLeft.x + "," + roomBottomLeft.y + "\n" +
-                               "X1,Y2: " + roomTopLeft.x + "," + roomTopLeft.y + "\n" +
-                               "X2,Y1: " + roomBottomRight.x + "," + roomBottomRight.y + "\n" +
-                               "X2,Y2: " + roomTopLeft.x + "," + roomTopRight.y +"\n");
-                       System.out.println("--------------------------------------------------------------");
-                   }
-
-                   neighbours++;
-
-
-               }
-            }
-        }
-//        System.out.println("NeighborCount: " + neighbours);
-
-        if (neighbours != 0) {
-            v.x = v.x / neighbours;
-            v.y = v.y / neighbours;
-            v.x = v.x * -1;
-            v.y = v.y * -1;
-            return v.nor();
-        } else {
-            return v;
-        }
-    }
-
-    private boolean roomIsInBottomLeftQuadrant(Vector2 room, Vector2 currRoom) {
-
-        return (room.x <= currRoom.x && room.y <= currRoom.y);
-    }
-
-    private boolean roomIsInTopLeftQuadrant(Vector2 room, Vector2 currRoom) {
-
-        return (room.x <= currRoom.x && room.y >= currRoom.y);
-    }
-
-    private boolean roomIsInTopRightQuadrant(Vector2 room, Vector2 currRoom) {
-
-        return (room.x >= currRoom.x && room.y >= currRoom.y);
-    }
-
     private int getDifference(int num1, int num2) {
         if (num1 > num2) {
             return num1 - num2;
@@ -326,26 +263,4 @@ public class DungeonGenerator {
             return num2 - num1;
         }
     }
-    private void moveRoomInRandomDirection(Room room) {
-        ++moveRandomCalled;
-        int moveDirection = getRandom(0, 15);
-        if (moveDirection <= 5) {
-            room.getRectangle().setPosition(room.getRectangle().x -1, room.getRectangle().y);
-            room.setMovedLeft(room.getMovedLeft() + 1);
-        }
-        if (moveDirection > 5 && moveDirection <= 10) {
-            room.getRectangle().setPosition(room.getRectangle().x +1, room.getRectangle().y);
-            room.setMovedRight(room.getMovedRight() + 1);
-        }
-        if (moveDirection > 10 && moveDirection <=12) {
-            room.getRectangle().setPosition(room.getRectangle().x, room.getRectangle().y + 1);
-            room.setMovedUp(room.getMovedUp() + 1);
-        }
-
-        if (moveDirection > 12) {
-            room.getRectangle().setPosition(room.getRectangle().x, room.getRectangle().y -1);
-            room.setMovedDown(room.getMovedDown() + 1);
-        }
-    }
-
 }
