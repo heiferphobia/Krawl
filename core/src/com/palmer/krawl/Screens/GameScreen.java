@@ -152,7 +152,7 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
                 shapeRenderer.setColor(Color.ORANGE);
                 List<Object> spanningTree = Arrays.asList(dungeonGenerator.getMinimumSpanningTree().toArray());
                 for (int x = 0; x < spanningTree.size() -2; x++) {
-                    if (x != spanningTree.size() -1) {
+                    if (x != spanningTree.size() -2) {
                         PointDT spanningTreeX = (PointDT)spanningTree.get(x);
                         PointDT spanningTreeXPlus1 = (PointDT)spanningTree.get(x +1);
                         shapeRenderer.line((float)spanningTreeX.x(), (float) spanningTreeX.y(), (float) spanningTreeXPlus1.x(), (float) spanningTreeXPlus1.y());
