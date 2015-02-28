@@ -130,7 +130,6 @@ public class DungeonGenerator {
             PointDT newPoint = new PointDT((int)vector2.x, (int)vector2.y);
             dt.insertPoint(newPoint);
         }
-
         Iterator<TriangleDT> trianglesIterator = dt.trianglesIterator();
         triangles = new CopyOnWriteArrayList<TriangleDT>();
         while (trianglesIterator.hasNext()) {

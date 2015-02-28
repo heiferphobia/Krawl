@@ -40,8 +40,8 @@ public class GameScreen implements Screen, GestureDetector.GestureListener, Inpu
     boolean showRoomPoints = false;
     boolean showSpanningTree = true;
     boolean roomsGenerated = false;
-    private static final int MIN_ROOMS = 10;
-    private static final int MAX_ROOMS = 20;
+    private static final int MIN_ROOMS = 5;
+    private static final int MAX_ROOMS = 10;
 
     private DungeonGenerator dungeonGenerator;
 
